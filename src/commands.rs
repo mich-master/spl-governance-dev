@@ -19,9 +19,9 @@ use borsh::{BorshDeserialize};
 use spl_governance::{
     state::{
         enums::{
-            VoteThresholdPercentage,
+            // VoteThresholdPercentage,
             // VoteWeightSource,
-            VoteTipping,
+            // VoteTipping,
             MintMaxVoteWeightSource,
         },
         governance::{
@@ -42,9 +42,9 @@ use spl_governance::{
             TokenOwnerRecordV2,
             get_token_owner_record_address,
         },
-        signatory_record::{
-            get_signatory_record_address,
-        },
+        // signatory_record::{
+        //     get_signatory_record_address,
+        // },
         vote_record::{
             Vote,
             VoteChoice,
@@ -75,6 +75,12 @@ use spl_governance_addin_mock::{
     instruction::{
         setup_voter_weight_record,
         setup_max_voter_weight_record,
+    }
+};
+
+use spl_governance_addin_fixed_weights::{
+    instruction::{
+        get_max_voter_weight_address,
     }
 };
 
@@ -153,7 +159,7 @@ impl SplGovernanceInteractor {
         MaxVoterWeightRecord::deserialize(&mut dt).unwrap()
     }
 
-    pub fn create_realm(&self, realm_authority: Keypair, community_mint_pubkey: &Pubkey, addin_opt: Option<Pubkey>, realm_name: &str) -> Result<Realm,()> {
+    pub fn create_realm(&self, realm_authority: Keypair, community_mint_pubkey: &Pubkey, addin_opt: Option<Pubkey>, realm_name: &str) -> Result<Realm,ClientError> {
         let realm_pubkey: Pubkey = self.get_realm_address(realm_name);
 
         if self.account_exists(&realm_pubkey) {
@@ -161,9 +167,9 @@ impl SplGovernanceInteractor {
                 Realm {
                     authority: realm_authority,
                     address: realm_pubkey,
-                    data: self.get_realm_v2(realm_name)?,
+                    data: self.get_realm_v2(realm_name).unwrap(),
                     max_voter_weight_addin_address: addin_opt,
-                    voter_weight_addin_address: addin_opt,
+                    // voter_weight_addin_address: addin_opt,
                 }
             )
         } else {
@@ -203,10 +209,10 @@ impl SplGovernanceInteractor {
                         address: realm_pubkey,
                         data: self.get_realm_v2(realm_name).unwrap(),
                         max_voter_weight_addin_address: addin_opt,
-                        voter_weight_addin_address: addin_opt,
+                        // voter_weight_addin_address: addin_opt,
                     }
                 )
-                .map_err(|_|())
+                // .map_err(|_|())
         }
     }
 
@@ -220,9 +226,9 @@ impl SplGovernanceInteractor {
                     authority: token_owner_keypair,
                     token_owner_record_address: token_owner_record_pubkey,
                     token_owner_record: self.get_token_owner_record_v2(&token_owner_pubkey, &realm.data.community_mint, &realm.data.name),
-                    voter_weight_record_authority: None,
+                    // voter_weight_record_authority: None,
                     voter_weight_record_address: None,
-                    voter_weight_record: None,
+                    // voter_weight_record: None,
                 }
             )
         } else {
@@ -255,16 +261,16 @@ impl SplGovernanceInteractor {
                         authority: token_owner_keypair,
                         token_owner_record_address: token_owner_record_pubkey,
                         token_owner_record: self.get_token_owner_record_v2(&token_owner_pubkey, &realm.data.community_mint, &realm.data.name),
-                        voter_weight_record_authority: None,
+                        // voter_weight_record_authority: None,
                         voter_weight_record_address: None,
-                        voter_weight_record: None,
+                        // voter_weight_record: None,
                     }
                 )
                 .map_err(|_|())
         }
     }
 
-    pub fn setup_max_voter_weight_record(&self, realm: &Realm, max_voter_weight_record_keypair: Keypair, max_voter_weight: u64) -> Result<Signature,()> {
+    pub fn _setup_max_voter_weight_record_mock(&self, realm: &Realm, max_voter_weight_record_keypair: Keypair, max_voter_weight: u64) -> Result<Signature,()> {
         let max_voter_weight_record_pubkey: Pubkey = max_voter_weight_record_keypair.pubkey();
 
         if self.account_exists(&max_voter_weight_record_pubkey) {
@@ -301,7 +307,45 @@ impl SplGovernanceInteractor {
         }
     }
 
-    pub fn setup_voter_weight_record(&self, realm: &Realm, token_owner: TokenOwner, voter_weight_record_keypair: Keypair, voter_weight: u64) -> Result<TokenOwner,()> {
+    // pub fn setup_max_voter_weight_record_fixed(&self, voter_weight_addin_autority: &Keypair, realm: &Realm, max_voter_weight: u64) -> ClientResult<Signature> {
+    pub fn setup_max_voter_weight_record_fixed(&self, realm: &Realm) -> Result<Signature,()> {
+        // let max_voter_weight_record_pubkey: Pubkey = max_voter_weight_record_keypair.pubkey();
+        let (max_voter_weight_record_pubkey,_): (Pubkey,u8) = spl_governance_addin_fixed_weights::instruction::get_max_voter_weight_address(&self.spl_governance_voter_weight_addin_address, &realm.address, &realm.data.community_mint);
+
+        if self.account_exists(&max_voter_weight_record_pubkey) {
+            Err(())
+        } else {
+            let realm_authority_pubkey: Pubkey = realm.authority.pubkey();
+
+            let setup_max_voter_weight_record_instruction: Instruction =
+                spl_governance_addin_fixed_weights::instruction::setup_max_voter_weight_record(
+                    &self.spl_governance_voter_weight_addin_address,
+                    &realm.address,
+                    &realm.data.community_mint,
+                    &realm_authority_pubkey,
+                    // max_voter_weight,
+                );
+            
+            let transaction: Transaction =
+                Transaction::new_signed_with_payer(
+                    &[
+                        setup_max_voter_weight_record_instruction,
+                    ],
+                    Some(&realm_authority_pubkey),
+                    &[
+                        &realm.authority,
+                        // voter_weight_addin_autority,
+                        // &max_voter_weight_record_keypair,
+                    ],
+                    self.solana_client.get_latest_blockhash().unwrap(),
+                );
+            
+            self.solana_client.send_and_confirm_transaction(&transaction)
+                .map_err(|_|())
+        }
+    }
+
+    pub fn _setup_voter_weight_record_mock(&self, realm: &Realm, token_owner: TokenOwner, voter_weight_record_keypair: Keypair, voter_weight: u64) -> Result<TokenOwner,()> {
         let voter_weight_record_pubkey: Pubkey = voter_weight_record_keypair.pubkey();
 
         if self.account_exists(&voter_weight_record_pubkey) {
@@ -310,9 +354,9 @@ impl SplGovernanceInteractor {
                     authority: token_owner.authority,
                     token_owner_record_address: token_owner.token_owner_record_address,
                     token_owner_record: token_owner.token_owner_record,
-                    voter_weight_record_authority: Some(voter_weight_record_keypair),
+                    // voter_weight_record_authority: Some(voter_weight_record_keypair),
                     voter_weight_record_address: Some(voter_weight_record_pubkey),
-                    voter_weight_record: Some(self.get_voter_weight_record(&voter_weight_record_pubkey)),
+                    // voter_weight_record: Some(self.get_voter_weight_record(&voter_weight_record_pubkey)),
                 }
             )
         } else {
@@ -351,9 +395,64 @@ impl SplGovernanceInteractor {
                         authority: token_owner.authority,
                         token_owner_record_address: token_owner.token_owner_record_address,
                         token_owner_record: token_owner.token_owner_record,
-                        voter_weight_record_authority: Some(voter_weight_record_keypair),
+                        // voter_weight_record_authority: Some(voter_weight_record_keypair),
                         voter_weight_record_address: Some(voter_weight_record_pubkey),
-                        voter_weight_record: Some(self.get_voter_weight_record(&voter_weight_record_pubkey)),
+                        // voter_weight_record: Some(self.get_voter_weight_record(&voter_weight_record_pubkey)),
+                    }
+                )
+                .map_err(|_|())
+        }
+    }
+
+    pub fn setup_voter_weight_record_fixed(&self, realm: &Realm, token_owner: TokenOwner) -> Result<TokenOwner,()> {
+        let token_owner_pubkey: Pubkey = token_owner.authority.pubkey();
+        let (voter_weight_record_pubkey,_): (Pubkey,u8) = spl_governance_addin_fixed_weights::instruction::get_voter_weight_address(&self.spl_governance_voter_weight_addin_address, &realm.address, &realm.data.community_mint, &token_owner_pubkey);
+
+        if self.account_exists(&voter_weight_record_pubkey) {
+            Ok(
+                TokenOwner {
+                    authority: token_owner.authority,
+                    token_owner_record_address: token_owner.token_owner_record_address,
+                    token_owner_record: token_owner.token_owner_record,
+                    // voter_weight_record_authority: None,
+                    voter_weight_record_address: Some(voter_weight_record_pubkey),
+                    // voter_weight_record: Some(self.get_voter_weight_record(&voter_weight_record_pubkey)),
+                }
+            )
+        } else {
+            let realm_authority_pubkey: Pubkey = realm.authority.pubkey();
+
+            let setup_voter_weight_record_instruction: Instruction =
+                spl_governance_addin_fixed_weights::instruction::setup_voter_weight_record(
+                    &self.spl_governance_voter_weight_addin_address,
+                    &realm.address,
+                    &realm.data.community_mint,
+                    &token_owner_pubkey,
+                    &realm_authority_pubkey,
+                );
+            
+            let transaction: Transaction =
+                Transaction::new_signed_with_payer(
+                    &[
+                        setup_voter_weight_record_instruction,
+                    ],
+                    Some(&realm_authority_pubkey),
+                    &[
+                        &realm.authority,
+                        // &voter_weight_record_keypair,
+                    ],
+                    self.solana_client.get_latest_blockhash().unwrap(),
+                );
+            
+            self.solana_client.send_and_confirm_transaction(&transaction)
+                .map(|_|
+                    TokenOwner {
+                        authority: token_owner.authority,
+                        token_owner_record_address: token_owner.token_owner_record_address,
+                        token_owner_record: token_owner.token_owner_record,
+                        // voter_weight_record_authority: None,
+                        voter_weight_record_address: Some(voter_weight_record_pubkey),
+                        // voter_weight_record: Some(self.get_voter_weight_record(&voter_weight_record_pubkey)),
                     }
                 )
                 .map_err(|_|())
@@ -498,7 +597,7 @@ impl SplGovernanceInteractor {
             )
     }
 
-    pub fn add_signatory(&self, realm: &Realm, governance: &Governance, proposal: &Proposal, token_owner: &TokenOwner) -> Result<Signature,ClientError> {
+    pub fn _add_signatory(&self, realm: &Realm, _governance: &Governance, proposal: &Proposal, token_owner: &TokenOwner) -> Result<Signature,ClientError> {
         let realm_authority_pubkey: Pubkey = realm.authority.pubkey();
         // let signatory_record_address = get_signatory_record_address(&self.spl_governance_program_address, &proposal.address, &token_owner.authority.pubkey());
 
@@ -533,9 +632,10 @@ impl SplGovernanceInteractor {
             // )
     }
 
-    pub fn cast_vote(&self, realm: &Realm, governance: &Governance, proposal: &Proposal, voter: &TokenOwner, max_voter_weight_record_pubkey_opt: Option<Pubkey>, vote_yes_no: bool) -> ClientResult<Signature> {
-        let realm_authority_pubkey: Pubkey = realm.authority.pubkey();
+    pub fn cast_vote(&self, realm: &Realm, governance: &Governance, proposal: &Proposal, voter: &TokenOwner, vote_yes_no: bool) -> ClientResult<Signature> {
         let voter_authority_pubkey: Pubkey = voter.authority.pubkey();
+        let max_voter_weight_addin_address: &Pubkey = &realm.max_voter_weight_addin_address.unwrap();
+        let (max_voter_weight_record_address,_) = get_max_voter_weight_address(max_voter_weight_addin_address, &realm.address, &realm.data.community_mint);
 
         let vote: Vote =
             if vote_yes_no {
@@ -561,7 +661,7 @@ impl SplGovernanceInteractor {
                 &realm.data.community_mint,
                 &voter_authority_pubkey,
                 voter.voter_weight_record_address,
-                max_voter_weight_record_pubkey_opt,
+                Some(max_voter_weight_record_address),
                 vote,
             );
         
@@ -572,9 +672,7 @@ impl SplGovernanceInteractor {
                 ],
                 Some(&voter_authority_pubkey),
                 &[
-                    // &realm.authority,
                     &voter.authority,
-                    // &voter.voter_weight_record_authority.as_ref().unwrap(),
                 ],
                 self.solana_client.get_latest_blockhash().unwrap(),
             );
@@ -586,10 +684,10 @@ impl SplGovernanceInteractor {
 #[derive(Debug)]
 pub struct Realm {
     authority: Keypair,
-    address: Pubkey,
+    pub address: Pubkey,
     data: RealmV2,
     max_voter_weight_addin_address: Option<Pubkey>,
-    voter_weight_addin_address: Option<Pubkey>,
+    // voter_weight_addin_address: Option<Pubkey>,
 }
 
 #[derive(Debug)]
@@ -612,10 +710,10 @@ pub struct Proposal {
 
 #[derive(Debug)]
 pub struct TokenOwner {
-    authority: Keypair,
+    pub authority: Keypair,
     token_owner_record_address: Pubkey,
     token_owner_record: TokenOwnerRecordV2,
-    voter_weight_record_authority: Option<Keypair>,
+    // voter_weight_record_authority: Option<Keypair>,
     voter_weight_record_address: Option<Pubkey>,
-    voter_weight_record: Option<VoterWeightRecord>,
+    // voter_weight_record: Option<VoterWeightRecord>,
 }
