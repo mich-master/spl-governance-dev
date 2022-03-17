@@ -32,14 +32,9 @@ mod commands;
 
 use commands::{ Realm, Governance, Proposal, TokenOwner };
 
-// const WALLET_FILE_PATH: &'static str = "/home/mich/.config/solana/id.json";
-
-// const GOVERNANCE_KEY_FILE_PATH: &'static str = "/media/mich/speedwork/NeonLabs/artifacts/governance.json";
 const GOVERNANCE_KEY_FILE_PATH: &'static str = "/media/mich/speedwork/SolanaProgs/solana-program-library/target/deploy/spl_governance-keypair.json";
-// const VOTER_WEIGHT_ADDIN_KEY_FILE_PATH: &'static str = "/media/mich/speedwork/SolanaProgs/solana-program-library/target/deploy/spl_governance_addin_mock-keypair.json";
 const VOTER_WEIGHT_ADDIN_KEY_FILE_PATH: &'static str = "../neon-spl-governance/artifacts/addin-fixed-weights.keypair";
 const COMMUTINY_MINT_KEY_FILE_PATH: &'static str = "../artifacts/dev/token_mints/USDT.keypair";
-// const COMMUTINY_MINT_KEY_FILE_PATH: &'static str = "/media/mich/speedwork/NeonLabs/artifacts/community-mint.json";
 const GOVERNED_MINT_KEY_FILE_PATH: &'static str = "../artifacts/dev/token_mints/wBAL.keypair";
 
 // const MAX_VOTER_WEIGHT_RECORD_KEY_FILE_PATH: &'static str = "/media/mich/speedwork/NeonLabs/artifacts/max-voter-weight-record.keypair";
